@@ -2285,15 +2285,20 @@ const XARITALAR = {
   etm: { n: "Esri Topo Map", u: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"], c: "Esri" },
   esm: { n: "Esri Street Map", u: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"], c: "Esri" },
   edg: { n: "Esri Dark Gray", u: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"], c: "Esri" },
-  gs: { n: "Google Satellite", u: ["https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"], c: "Google" },
-  gh: { n: "Google Hybrid", u: ["https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"], c: "Google" },
-  gr: { n: "Google Roadmap", u: ["https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"], c: "Google" },
-  gt: { n: "Google Terrain", u: ["https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}"], c: "Google" }
+  gs: { n: "Google Satellite", u: ["https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&hl={hl}"], c: "Google" },
+  gh: { n: "Google Hybrid", u: ["https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl={hl}"], c: "Google" },
+  gr: { n: "Google Roadmap", u: ["https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl={hl}"], c: "Google" },
+  gt: { n: "Google Terrain", u: ["https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}&hl={hl}"], c: "Google" }
 };
 let xarK = null, xarAsl = null, xarFineAsl = null, xarNav = 0;
 const xarTex = {};
+// xaritadagi nom (tuman, qishloq) tili: Google bo'laklari hl= bilan keladi. Google'da o'zbekcha joy nomlari yo'q -> uz uchun lotin (en) yozuvi.
+const XAR_HL = { uz: "en", en: "en", ru: "ru", my: "my" };
+function xarHl() { let l = "uz"; try { l = window.FloodTil ? FloodTil.lang : (localStorage.getItem("minbu_lang") || "uz"); } catch (e) {} return XAR_HL[l] || "en"; }
+function xarKey(k) { return k && XARITALAR[k].u.some(u => u.includes("{hl}")) ? k + "|" + xarHl() : k; }
 function xarTayyorla(k) {   // butun tuman uchun UTM tekstura: Web Mercator bo'laklari affin o'zgartirish bilan chiziladi
-  if (xarTex[k]) return xarTex[k];
+  const kk = xarKey(k), hl = xarHl();
+  if (xarTex[kk]) return xarTex[kk];
   // bosqichlar: avval qo'pol (z11, ~15 bo'lak — ~1 s; so'ng z12), keyin aniq (z14, kamera qaragan joydan boshlab)
   const L = XARITALAR[k], CW = 4096, CH = Math.round(CW * H / W), s = W * RES / CW;
   const cv = document.createElement("canvas"); cv.width = CW; cv.height = CH;
@@ -2335,7 +2340,7 @@ function xarTayyorla(k) {   // butun tuman uchun UTM tekstura: Web Mercator bo'l
   const ishchi = async () => {
     while (keyingi < navbat.length) {
       const n = keyingi++, b = navbat[n], sd = (b.x + b.y) % 4;
-      const ims = await Promise.all(L.u.map(u => img(u.replace("{z}", b.Z).replace("{x}", b.x).replace("{y}", b.y).replace("{s}", sd))));
+      const ims = await Promise.all(L.u.map(u => img(u.replace("{z}", b.Z).replace("{x}", b.x).replace("{y}", b.y).replace("{s}", sd).replace("{hl}", hl))));
       tayyorlar.set(n, ims); R.tayyor++;
       if (n >= R.qop || chizildi < R.qop) navChiz();
       if ((chizildi === R.qop || chizildi === R.q11) && yangi) { t.needsUpdate = true; yangi = false; oxirgi = performance.now(); dirty = true; }   // qo'pol xarita darhol
@@ -2349,11 +2354,11 @@ function xarTayyorla(k) {   // butun tuman uchun UTM tekstura: Web Mercator bo'l
     xarHolat();
     if (R.tayyor >= R.jami && chizildi >= navbat.length && !yangi) clearInterval(tik);
   }, 250);
-  return (xarTex[k] = R);
+  return (xarTex[kk] = R);
 }
 function xarHolat() {
   const el = document.getElementById("mapH"); if (!el) return;
-  const R = xarK && xarTex[xarK];
+  const R = xarK && xarTex[xarKey(xarK)];
   el.textContent = !R ? "" : (R.tayyor < R.qop ? `yuklanmoqda ${Math.round(R.tayyor / R.qop * 100)}% · ` : R.tayyor < R.jami ? `tiniqlashmoqda ${Math.round((R.tayyor - R.qop) / (R.jami - R.qop) * 100)}% · ` : "") + "© " + R.c;
 }
 function xaritaTanla(k) {   // k = null -> portalning o'z sun'iy yo'ldosh tasviri
@@ -2363,6 +2368,8 @@ function xaritaTanla(k) {   // k = null -> portalning o'z sun'iy yo'ldosh tasvir
   else { U.uSat.value = xarTayyorla(k).t; fineOn = false; U.uFineR.value.w = 0; }
   xarHolat(); dirty = true;
 }
+// til almashganda: nomli Google xaritasi tanlangan bo'lsa, shu tildagi bo'laklar bilan qayta chiziladi
+addEventListener("floodtil", () => { if (xarK && xarKey(xarK) !== xarK) xaritaTanla(xarK); });
 // qalin chiziq geometriyasi (xz nuqtalar, balandlik funksiyasi bilan)
 function fatGeom(pts, hf, closed) {
   const n = pts.length, P = new Float32Array(n * 2 * 3), A = new Float32Array(n * 2), O = new Float32Array(n * 2 * 3), Sd = new Float32Array(n * 2);
@@ -4739,6 +4746,7 @@ function set(l) {
   if (!(l in IDX)) return;
   busy = true; try { walk(document.body, restoreNode, null); } finally { busy = false; }
   lang = l; try { localStorage.setItem('minbu_lang', l); } catch (e) {}
+  try { window.dispatchEvent(new Event('floodtil')); } catch (e) {}
   document.documentElement.lang = l === 'uz' ? 'uz' : l;
   paint(); apply();
 }
