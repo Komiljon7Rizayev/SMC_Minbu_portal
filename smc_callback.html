@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Minbu Portal</title>
+<body style="background:#0c1b12;color:#ecf4e6;font:14px system-ui;display:grid;place-items:center;height:100vh;margin:0">
+<p>Kirish tugallanmoqda…</p>
+<script>
+var q=new URLSearchParams(location.search),d={minbu:1,code:q.get('code'),state:q.get('state'),error:q.get('error')};
+if(window.opener&&!window.opener.closed){window.opener.postMessage(d,location.origin);window.close()}
+else{location.replace(location.pathname.replace(/smc_callback\.html$/,'smc_index.html')+location.search)}
+</script>
